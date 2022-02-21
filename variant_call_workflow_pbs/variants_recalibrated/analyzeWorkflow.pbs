@@ -1,0 +1,73 @@
+#!/bin/bash
+
+#PBS -V
+#PBS -N analyzeWorkflow
+#PBS -q default
+#PBS -l walltime=200:00:00
+#PBS -o EDIT
+#PBS -l nodes=1:ppn=20
+#PBS -M EDIT
+#PBS -m abe
+
+echo Start: $(date)
+
+outputDir=EDIT
+logDir=EDIT
+bedPath=EDIT
+exomeVCF=EDIT
+
+echo Create BED files - $(date)
+
+for CHROM in chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr19 chr20 chr21 chr22 chrX chrY
+do
+	cat $bedPath | grep -P "$CHROM\t" > $logDir/exome_$CHROM.bed
+done
+
+echo Separate VCF per CHR - $(date)
+
+export OMP_NUM_THREADS=10
+parallel="parallel --delay .2 -j 10 --joblog $logDir/analyzeWorkflow_separateChr_parallel.log "
+$parallel /opt/bcftools-1.10.2/bcftools view \
+	$exomeVCF \
+	-R $logDir/exome_{}.bed \
+	-o $outputDir/exome_{}.vcf.gz \
+	-O z \
+	&> $logDir/analyzeWorkflow_bcfView.log \
+	 ::: chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 \
+	chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18  chr19 chr20 chr21 chr22 chrX chrY
+
+echo Index VCFs - $(date)
+
+parallel /opt/samtools-1.9/htslib-1.9/tabix \
+	$outputDir/exome_{}.vcf.gz ::: chr1 \
+	chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY
+
+echo CollectVariantCallingMetrics per chromosome - $(date)
+
+export OMP_NUM_THREADS=6
+parallel="parallel --delay .2 -j 6 --joblog $logDir/analyzeWorkflow_chrCVCM_parallel.log "
+$parallel /opt/gatk-4.2.0.0/gatk --java-options "-Xmx10g" \
+	CollectVariantCallingMetrics \
+	-I $outputDir/exome_{}.vcf.gz \
+	--DBSNP EDIT \
+	-SD EDIT \
+	-O $outputDir/collectVariantCallingMetrics_{}_report \
+	&> $logDir/CollectVariantCallingMetrics_chr.log \
+	::: chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY
+
+echo gatk CollectVariantCallingMetrics all - $(date)
+
+/opt/gatk-4.2.0.0/gatk CollectVariantCallingMetrics \
+    -I $exomeVCF \
+    --DBSNP EDIT \
+    -SD EDIT \
+    -O $outputDir/report_CollectVariantCallingMetrics__all_report \
+    &> $logDir/CollectVariantCallingMetrics_all.log
+
+
+echo Clean - $(date)
+
+rm $logDir/exome_*.bed
+rm $outputDir/exome_*.vcf.gz
+
+echo End: $(date)

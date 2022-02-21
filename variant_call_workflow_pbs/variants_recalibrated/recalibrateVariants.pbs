@@ -1,0 +1,131 @@
+#!/bin/bash
+
+#PBS -V
+#PBS -N recalibrate-variants
+#PBS -q default
+#PBS -l walltime=200:00:00
+#PBS -o /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/recalibrate-variants.log
+#PBS -l nodes=1:ppn=20
+#PBS -M jcvalverdehernandez@gmail.com
+#PBS -m abe
+
+echo Start time: $(date)
+
+echo gatk VariantFiltration - $(date)
+
+/opt/gatk-4.2.0.0/gatk --java-options "-Xmx60g" VariantFiltration \
+    -V /home/jcvh/cr_dislipidemia/data/variants_joint/subjects_cr/variants_joint.vcf.gz \
+    --filter-expression "ExcessHet > 54.69" \
+    --filter-name ExcessHet \
+    -O  /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/variants_joint_HetFiltered.vcf.gz \
+    &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/VariantFiltration_ExcessHet.log
+
+echo gatk MakeSitesOnlyVcf - $(date)
+
+/opt/gatk-4.2.0.0/gatk MakeSitesOnlyVcf \
+    -I /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/variants_joint_HetFiltered.vcf.gz \
+    -O /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/genotype_sites.vcf.gz \
+    &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/makeSitesOnlyVcf.log
+
+echo gatk VariantRecalibrator_indels - $(date)
+
+/opt/gatk-4.2.0.0/gatk --java-options "-Xmx60g" VariantRecalibrator \
+    -V /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/genotype_sites.vcf.gz \
+    --trust-all-polymorphic \
+    -tranche 100.0 -tranche 99.95 -tranche 99.5 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 96.0 -tranche 95.0 -tranche 92.5 -tranche 90.0 \
+    -an FS -an ReadPosRankSum -an MQRankSum -an QD -an SOR -an DP \
+    -R /home/jcvh/cr_dislipidemia/study-specs/referenceGenome/Homo_sapiens_assembly38.fasta \
+    -mode INDEL \
+    --max-gaussians 4 \
+    --resource:mills,known=false,training=true,truth=true,prior=12 /home/jcvh/cr_dislipidemia/study-specs/variantsReference/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz \
+    --resource:axiomPoly,known=false,training=true,truth=false,prior=10 /home/jcvh/cr_dislipidemia/study-specs/variantsReference/Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz \
+    --resource:dbsnp,known=true,training=false,truth=false,prior=2.0 /home/jcvh/cr_dislipidemia/study-specs/variantsReference/dbsnp_human_9606_b151_GRCh38p7_all.vcf.gz \
+    -O /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/indels.recal \
+    --tranches-file /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/indels.tranches \
+    --rscript-file  /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/indels_plots.r \
+    &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/indels_VariantRecalibrator.log
+
+echo gatk VariantRecalibrator_snps - $(date)
+
+/opt/gatk-4.2.0.0/gatk --java-options "-Xmx60g" VariantRecalibrator  \
+    -V /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/genotype_sites.vcf.gz \
+    --trust-all-polymorphic \
+    -tranche 100.0 -tranche 99.95 -tranche 99.5 -tranche 99.0 -tranche 98.0 -tranche 97.0 -tranche 96.0 -tranche 95.0 -tranche 92.5 -tranche 90.0 \
+    -an QD -an MQRankSum -an ReadPosRankSum -an FS -an MQ -an SOR -an DP \
+     -R /home/jcvh/cr_dislipidemia/study-specs/referenceGenome/Homo_sapiens_assembly38.fasta \
+    -mode SNP \
+    --max-gaussians 6 \
+    --resource:hapmap,known=false,training=true,truth=true,prior=15.0 https://storage.googleapis.com/genomics-public-data/resources/broad/hg38/v0/hapmap_3.3.hg38.vcf.gz \
+    --resource:omni,known=false,training=true,truth=false,prior=12.0 /home/jcvh/cr_dislipidemia/study-specs/variantsReference/1000G_omni2.5.hg38.vcf.gz  \
+    --resource:1000G,known=false,training=true,truth=false,prior=10.0 /home/jcvh/cr_dislipidemia/study-specs/variantsReference/1000G_phase1.snps.high_confidence.hg38.vcf.gz \
+    --resource:dbsnp,known=true,training=false,truth=false,prior=7.0 /home/jcvh/cr_dislipidemia/study-specs/variantsReference/dbsnp_human_9606_b151_GRCh38p7_all.vcf.gz \
+    -O /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/snps.recal \
+    --tranches-file /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/snps.tranches \
+    --rscript-file  /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/snps_plots.r \
+     &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/snps_VariantRecalibrator.log
+
+echo gatk ApplyVQSR_indels - $(date)
+
+/opt/gatk-4.2.0.0/gatk --java-options "-Xmx60g" \
+    ApplyVQSR \
+    -R /home/jcvh/cr_dislipidemia/study-specs/referenceGenome/Homo_sapiens_assembly38.fasta \
+    -V /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/variants_joint_HetFiltered.vcf.gz \
+    -L /home/jcvh/cr_dislipidemia/study-specs/genomicCoordinates/unix_scattered-intervals-hg38.list \
+    --recal-file /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/indels.recal \
+    --tranches-file //home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/indels.tranches \
+    --truth-sensitivity-filter-level 95.0 \
+    --create-output-variant-index true \
+    -mode INDEL \
+    -O /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/genotypePartialRecalibrated.vcf.gz \
+    &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/indels_ApplyVQSR.log
+
+echo gatk ApplyVQSR_snps - $(date)
+
+/opt/gatk-4.2.0.0/gatk --java-options "-Xmx60g" \
+    ApplyVQSR \
+    -R /home/jcvh/cr_dislipidemia/study-specs/referenceGenome/Homo_sapiens_assembly38.fasta \
+    -V /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/genotypePartialRecalibrated.vcf.gz \
+    -L /home/jcvh/cr_dislipidemia/study-specs/genomicCoordinates/unix_scattered-intervals-hg38.list \
+    --recal-file /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/snps.recal \
+    --tranches-file /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/snps.tranches \
+    --truth-sensitivity-filter-level 97.5 \
+    --create-output-variant-index true \
+    -mode SNP \
+    -O /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/exomeGenotypes.vcf.gz \
+    &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/snps_ApplyVQSR.log
+
+echo bcftools view - $(date)
+
+/opt/bcftools-1.10.2/bcftools view \
+    //home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/exomeGenotypes.vcf.gz \
+    -R /home/jcvh/cr_dislipidemia/study-specs/genomicCoordinates/unix_roi_coordinates.bed \
+    -o /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/roiGenotypes.vcf -O v \
+    &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/bcftools_regionExtract.log
+
+echo gatk VariantsToTable - $(date)
+
+/opt/gatk-4.2.0.0/gatk VariantsToTable \
+    -V /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/roiGenotypes.vcf \
+    -F CHROM -F POS -F ID -F REF -F ALT -GF GT \
+    -O /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/roiGenotypes_VariantsToTable.tsv
+
+#echo gatk CollectVariantCallingMetrics - $(date)
+
+#/opt/gatk-4.2.0.0/gatk CollectVariantCallingMetrics \
+#    -I /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/exomeGenotypes.vcf.gz \
+#    --DBSNP /home/jcvh/cr_dislipidemia/study-specs/variantsReference/dbsnp_human_9606_b151_GRCh38p7_all.vcf.gz \
+#    -SD /home/jcvh/cr_dislipidemia/study-specs/referenceGenome/Homo_sapiens_assembly38.dict \
+#    -O /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/report_CollectVariantCallingMetrics.txt \
+#    &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/CollectVariantCallingMetrics.log
+
+#echo gatk VariantEval - $(date)
+
+#/opt/gatk-4.2.0.0/gatk VariantEval \
+#    -R /home/jcvh/cr_dislipidemia/study-specs/referenceGenome/Homo_sapiens_assembly38.fasta \
+#    -D /home/jcvh/cr_dislipidemia/study-specs/variantsReference/dbsnp_human_9606_b151_GRCh38p7_all.vcf.gz \
+#    -eval /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/exomeGenotypes.vcf.gz \
+#    -O /home/jcvh/cr_dislipidemia/data/variants_recalibrated/subjects_cr/report_VariantEval.txt \
+#    &> /home/jcvh/cr_dislipidemia/logs/variants_recalibrated/subjects_cr/VariantEval.log
+
+
+echo End time: $(date)
