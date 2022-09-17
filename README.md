@@ -8,7 +8,7 @@ These scripts were used to be executed in the CENAT - Kabre and/or the UCR CICIM
 
 ## **/thesis__variant_call_workflow_pbs**
 The *thesis_variant_call_workflow_pbs* contains a set of scripts used for the thesis. In this case, scripts generates PBS scripts. It contains the following scripts:
-### reads_extract.py
+### 1 - **reads_extract.py**
 
 This script creates .sh, job lists and .pbs files to run in parallel the extraction of genomic data from CRAM files found in a specific set of genomic coordinates (should be provided) and converts it to BAM format.
 
@@ -16,7 +16,7 @@ This script creates .sh, job lists and .pbs files to run in parallel the extract
 
 > python reads_extract.py \<folder where to save scripts\> \<folder with the CRAM files to be processed\> \<3 column .bed with coordinates of interest\> \<folder where to store log files\> \<folder where to store output .bam\> \<path to the sam tools module\>
 
- ### 1- **reads_recalibrate.py**
+ ### 2 - **reads_recalibrate.py**
 
 This script creates .sh, job lists and .pbs files to run in parallel MarkDuplicates, BaseRecalibrator,ApplyBQSR and AnalyzeCovariates functions from GATK to the .bam files generated in last stage.
 
@@ -24,7 +24,7 @@ This script creates .sh, job lists and .pbs files to run in parallel MarkDuplica
 
 > python reads_recalibrate.py \<folder where to save scripts\> \<folder where un-recalibrated .bam files are\> \<folder where to store log files\> \<folder where to save recalibrated .bam files\> \<.fasta file corresponding to the reference genome\> \<.vcf.gz file from dbSNP\> \<path to GATK module\>
 
- ### 2 - **variants_individual.py**
+ ### 3 - **variants_individual.py**
 
 This script creates .sh, job lists and .pbs files to run in parallel Haplotypecaller function from GATK to the recalibrated .bam files generated in last stage.
 
@@ -36,7 +36,7 @@ This script creates .sh, job lists and .pbs files to run in parallel Haplotypeca
 
 > chr12:2000-340000
 
-### 3 - **variants_joint.py**
+### 4 - **variants_joint.py**
 
 This script creates .sh, job lists and .pbs files to run in parallel GenotypeGVCFs, GenomicsDBImport and MergeVcfs functions from GATK to the .gvcf files generated in last stage.
 
@@ -44,11 +44,11 @@ This script creates .sh, job lists and .pbs files to run in parallel GenotypeGVC
 
 > python variants_joint.py \<folder where to save scripts\> \<folder where the .gvcf files are\> \<folder where to store log files\> \<folder where save the merged .gvcf file\> \<.fasta file corresponding to the reference genome\> \<.list with coordinates of interest\> \<.vcf.gz file from dbSNP\> \<path to GATK module\>
 
-### 4 - **recalibrateVariants.pbs**
+### 5 - **recalibrateVariants.pbs**
 
 This is a .pbs script. It does not run in parallel the recalibration of the merged .gvcf file. In contrast to the .py scripts, parameters can't be specified to it through the command line.
 
-### 5 - **analyzeWorkflow.pbs**
+### 6 - **analyzeWorkflow.pbs**
 
 This is a .pbs script. It generates metrics that describe the output of the variant call workflow. In contrast to the .py scripts, parameters can't be specified to it through the command line.
 
